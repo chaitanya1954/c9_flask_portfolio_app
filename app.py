@@ -4,6 +4,11 @@ import pytz # timezone
 import requests
 import os
 
+from bs4 import BeautifulSoup
+import collections
+
+WeatherReport = collections.namedtuple('WeatherReport',
+                                           'condition,temp,scale,loc')
 
 
 app = Flask(__name__)
@@ -77,7 +82,68 @@ def time_post():
               
             return render_template('time.html', result=answer)
 
-         
+
+@app.route('/weather', methods=['GET', 'POST'])
+def weather_post():
+    # --> ['5', '6', '8']
+    # print(type(request.form['text']))
+
+
+    if request.method == 'GET':
+        return render_template('temperature.html')
+    elif request.method == 'POST':
+        print(request.form['text'])
+
+        # Declare Header
+        # Get zipcode input from user
+        # Display the  weather at that location
+
+        zip_code = request.form['text']
+        # print(zip_code)
+        html = get_html_from_web(zip_code)
+        # print(html)
+        report = weather_from_html(html)
+        complete_weather= 'The Temperature in {} is {} {} {}'.format(
+            report.loc, report.temp, report.scale, report.condition)
+
+    return render_template('temperature.html', result=complete_weather)
+
+
+def print_header():
+    print("+++++++++++++++++++++++++++++++++++++++++++")
+    print("Welcome to Chaitanya's Weather Application")
+    print("+++++++++++++++++++++++++++++++++++++++++++")
+
+def get_html_from_web(zip_code):
+    full_url = "https://www.wunderground.com/weather-forecast/{}".format(zip_code)
+    # print(full_url)
+    response = requests.get(full_url)
+    # print(response.status_code)
+    return response.text
+
+def weather_from_html(html):
+    soup = BeautifulSoup(html, 'html.parser')
+    # print(soup)
+    loc = soup.find(class_='region-content-header').find('h1').get_text()
+    condition = soup.find(class_='condition-icon').get_text()
+    temp = soup.find(class_='wu-unit-temperature').find(class_='wu-value').get_text()
+    scale = soup.find(class_='wu-unit-temperature').find(class_='wu-label').get_text()
+    loc = cleanup_text(loc)
+    condition = cleanup_text(condition)
+    temp = cleanup_text(temp)
+    scale = cleanup_text(scale)
+            # return condition, temp, scale, loc
+    report = WeatherReport(condition=condition, temp=temp, scale=scale, loc=loc)
+    return report
+
+
+def cleanup_text(text):
+    if not text:
+        return text
+    else:
+        text = text.strip()
+        return text
+
 
 @app.route('/python_apps')
 def python_apps_page():
@@ -92,3 +158,4 @@ def blog_page():
 
 if __name__ == '__main__':
 	app.run(debug=True)
+
